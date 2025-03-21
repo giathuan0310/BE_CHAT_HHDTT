@@ -43,6 +43,11 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpires: {
       type: Date,
     },
+    avatar: {
+      type: String,
+      default:
+        "https://res.cloudinary.com/dz7yojvna/image/upload/v1623495972/avatar/avatar-1_ylbq4a.png",
+    },
 
   },
   { timestamps: true }
