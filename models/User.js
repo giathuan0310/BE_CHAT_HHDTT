@@ -48,6 +48,10 @@ const userSchema = new mongoose.Schema(
       default:
         "https://res.cloudinary.com/dz7yojvna/image/upload/v1623495972/avatar/avatar-1_ylbq4a.png",
     },
+    isOnline: {
+      type: Boolean,
+      default: false,
+    },
 
   },
   { timestamps: true }
