@@ -196,7 +196,8 @@ verifyEmail: async (req, res) => {
               return res.status(400).json({message:"Email chưa được xác minh. Vui lòng kiểm tra email của bạn để xác minh tài khoản."});
           }
           
-  
+          user.isOnline = true;
+          await user.save();
           // Compare password
           const validPassword = await bcrypt.compare(
               req.body.password,

@@ -1,0 +1,51 @@
+const mongoose = require("mongoose");
+
+const ConversationSchema = new mongoose.Schema(
+  {
+    members: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    latestmessage: {
+      type: String,
+      default: "",
+    },
+    lastMessageSenderId: { // Thêm trường này
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    lastMessageId: { // Thêm trường này
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    isGroup: {
+      type: Boolean,
+      default: false,
+    },
+    name: {
+      type: String,
+      required: function () {
+        return this.isGroup;
+      },
+    },
+    unreadCounts: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        count: {
+          type: Number,
+          default: 0,
+        },
+      },
+    ],
+    groupAvatar: {
+      type: String,
+      default: "",
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Conversation = mongoose.model("Conversation", ConversationSchema);
+module.exports = Conversation;
