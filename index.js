@@ -7,6 +7,7 @@ const authRoute= require("./routes/auth");
 const conversationRoute = require("./routes/conversationRoute");
 const messageRoute = require("./routes/messageRoute");
 const userRoute = require("./routes/userRoute");
+const friendshipRoute = require("./routes/friendshipRoute");
 const http = require("http"); 
 
 const chatSocket = require("./chat-socket/chat-sockets");
@@ -45,7 +46,8 @@ app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001','http:/
 app.use("/v1/auth",authRoute);
 app.use("/conversations",conversationRoute);
 app.use("/messages",messageRoute);
-app.use("/users",userRoute);
+app.use("/users", userRoute);
+app.use("/friends", friendshipRoute);
 
 
 //Socket
