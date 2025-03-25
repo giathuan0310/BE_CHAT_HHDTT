@@ -28,9 +28,7 @@ const createConversation = async (req, res) => {
 const getUserConversationsWithMessages = async (req, res) => {
   try {
     const userId = req.params.userId;
-    const conversations = await Conversation.find({ members: userId })
-      .sort({ updatedAt: -1 });
-
+    const conversations = await Conversation.find({ members: userId });
     // Lấy message con cho từng conversation
     const conversationsWithMessages = await Promise.all(
       conversations.map(async (conv) => {

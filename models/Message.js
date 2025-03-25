@@ -67,11 +67,13 @@ const MessageSchema = new mongoose.Schema(
       },
     ],
     deletedFrom: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    isRecalled: { type: Boolean, default: false },
     replyTo: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
       ref: "Message",
     },
+    isPinned: { type: Boolean, default: false }, 
   },
   {
     timestamps: true,

@@ -57,10 +57,116 @@ const createMessage = async (req, res) => {
         latestText = "Tin nhắn mới";
     }
 
-    await Conversation.findByIdAndUpdate(conversationId, { latestmessage: latestText, updatedAt: Date.now() });
+    await Conversation.findByIdAndUpdate(conversationId, { 
+      latestmessage: latestText, 
+      lastMessageSenderId: senderId,
+      lastMessageId: savedMessage._id,
+      lastMessageTime: Date.now(),   // <== quan trọng, dùng để sort ở frontend
+    });
 
     res.status(201).json(savedMessage);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+const pinMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { isPinned } = req.body;
+
+    // Lấy tin nhắn hiện tại
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    // Nếu ghim tin nhắn, thì bỏ ghim các tin nhắn khác trong cùng conversation
+    if (isPinned) {
+      await Message.updateMany(
+        { conversationId: message.conversationId },
+        { $set: { isPinned: false } }
+      );
+    }
+
+    // Ghim hoặc bỏ ghim tin nhắn
+    const updatedMessage = await Message.findByIdAndUpdate(
+      messageId,
+      { isPinned },
+      { new: true }
+    );
+
+    res.status(200).json(updatedMessage);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+
+const deleteMessageFrom = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { userId } = req.body; // truyền userId vào body
+
+    const updatedMessage = await Message.findByIdAndUpdate(
+      messageId,
+      { $addToSet: { deletedFrom: userId } }, // tránh thêm trùng userId
+      { new: true }
+    );
+
+    res.status(200).json(updatedMessage);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+const recallMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return res.status(404).json({ message: "Tin nhắn không tồn tại" });
+    }
+
+    const createdAt = new Date(message.createdAt);
+    const now = new Date();
+
+    const isSameDay =
+      createdAt.getFullYear() === now.getFullYear() &&
+      createdAt.getMonth() === now.getMonth() &&
+      createdAt.getDate() === now.getDate();
+
+    if (!isSameDay) {
+      return res
+        .status(400)
+        .json({ message: "Chỉ có thể thu hồi tin nhắn trong ngày hiện tại" });
+    }
+
+    const recalledMessage = await Message.findByIdAndUpdate(
+      messageId,
+      { isRecalled: true, text: "" },
+      { new: true }
+    );
+
+    res.status(200).json(recalledMessage);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+const replyToMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { replyTo } = req.body;
+    const updatedMessage = await Message.findByIdAndUpdate(
+      messageId,
+      { replyTo },
+      { new: true }
+    );
+    res.status(200).json(updatedMessage);
+  }
+  catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
@@ -68,4 +174,8 @@ const createMessage = async (req, res) => {
 module.exports = {
   getMessagesByConversation,
   createMessage,
+  pinMessage,
+  deleteMessageFrom,
+  recallMessage,
+  replyToMessage,
 };
