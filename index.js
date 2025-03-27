@@ -48,8 +48,10 @@ app.use("/conversations",conversationRoute);
 app.use("/messages",messageRoute);
 app.use("/users", userRoute);
 app.use("/friends", friendshipRoute);
-
-
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
 //Socket
 const server = http.createServer(app);
 

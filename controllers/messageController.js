@@ -105,6 +105,8 @@ const deleteMessageFrom = async (req, res) => {
   try {
     const { messageId } = req.params;
     const { userId } = req.body; // truyền userId vào body
+    const conversationId = req.body.conversationId;
+    const conversation = await Conversation.findById(conversationId);
 
     const updatedMessage = await Message.findByIdAndUpdate(
       messageId,
@@ -112,6 +114,12 @@ const deleteMessageFrom = async (req, res) => {
       { new: true }
     );
 
+    // nếu message.text trùng với lastMessage trong conversation thì xóa lastMessage
+    if (updatedMessage.text === conversation.latestmessage) {
+      await Conversation.findByIdAndUpdate(conversationId, {
+        latestmessage: "",
+      });
+    }
     res.status(200).json(updatedMessage);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -122,8 +130,9 @@ const deleteMessageFrom = async (req, res) => {
 const recallMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
+    const conversationId = req.body.conversationId;
     const message = await Message.findById(messageId);
-
+    const conversation = await Conversation.findById(conversationId);
     if (!message) {
       return res.status(404).json({ message: "Tin nhắn không tồn tại" });
     }
@@ -131,6 +140,13 @@ const recallMessage = async (req, res) => {
     const createdAt = new Date(message.createdAt);
     const now = new Date();
 
+
+    // nếu message.text trùng với lastMessage trong conversation thì xóa lastMessage
+    if (message.text === conversation.latestmessage) {
+      await Conversation.findByIdAndUpdate(conversationId, {
+        latestmessage: "",
+      });
+    }
     const isSameDay =
       createdAt.getFullYear() === now.getFullYear() &&
       createdAt.getMonth() === now.getMonth() &&
