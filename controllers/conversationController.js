@@ -49,7 +49,36 @@ const getUserConversationsWithMessages = async (req, res) => {
   }
 };
 
+const getUserConversationsWithMessagesSearch = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    const conversations = await Conversation.find({ members: userId }).populate({
+      path: "members",
+      select: "username avatar", // Chỉ lấy username và image
+    });
+    // Lấy message con cho từng conversation
+    const conversationsWithMessages = await Promise.all(
+      conversations.map(async (conv) => {
+        const messages = await Message.find({ conversationId: conv._id })
+          .sort({ createdAt: 1 })
+          .limit(30); // chỉ lấy 30 tin nhắn gần nhất, có thể điều chỉnh
+
+        return {
+          ...conv._doc,
+          messages,
+        };
+      })
+    );
+
+    res.status(200).json(conversationsWithMessages);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 module.exports = {
   createConversation,
   getUserConversationsWithMessages,
+  getUserConversationsWithMessagesSearch
 };
