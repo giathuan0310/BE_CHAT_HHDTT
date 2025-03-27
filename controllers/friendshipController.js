@@ -83,13 +83,23 @@ const cancelFriendRequest = async (req, res) => {
 const unfriend = async (req, res) => {
     try {
         const { userId, friendId } = req.body;
-        await User.findByIdAndUpdate(userId, { $pull: { friends: friendId } });
-        await User.findByIdAndUpdate(friendId, { $pull: { friends: userId } });
+
+        // Xóa khỏi collection FriendRequest
+        await FriendRequest.deleteOne({
+            $or: [
+                { senderId: userId, receiverId: friendId },
+                { senderId: friendId, receiverId: userId },
+            ],
+        });
+
         res.status(200).json({ message: "Đã huỷ kết bạn" });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: "Lỗi khi hủy kết bạn" });
     }
 };
+
+
+
 
 //Kiểm tra lời mời kết bạn
 // API kiểm tra trạng thái lời mời kết bạn
@@ -124,6 +134,34 @@ const getFriendRequests = async (req, res) => {
     }
 };
 
+// Lấy danh sách bạn bè
+
+const getFriendsList = async (req, res) => {
+    try {
+        const { userId } = req.params; // Lấy userId từ URL params
+        console.log(`userId getFriendsList `, userId);
+
+        // Tìm tất cả lời mời kết bạn đã chấp nhận liên quan đến userId
+        const friendRequests = await FriendRequest.find({
+            $or: [{ senderId: userId }, { receiverId: userId }],
+            status: "accepted",
+        });
+
+        // Lấy danh sách ID bạn bè từ lời mời kết bạn đã chấp nhận
+        const friendIds = friendRequests.map((request) =>
+            request.senderId.toString() === userId ? request.receiverId : request.senderId
+        );
+
+        // Truy vấn danh sách bạn bè từ User collection
+        const friends = await User.find({ _id: { $in: friendIds } }).select("username avatar");
+
+        res.status(200).json(friends);
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách bạn bè:", error);
+        res.status(500).json({ error: "Lỗi khi lấy danh sách bạn bè" });
+    }
+};
+
 
 
 module.exports = {
@@ -134,5 +172,6 @@ module.exports = {
     cancelFriendRequest,
     unfriend,
     checkFriendRequestStatus,
-    getFriendRequests
+    getFriendRequests,
+    getFriendsList
 };

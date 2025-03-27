@@ -11,5 +11,6 @@ router.post("/cancel-request", friendshipController.cancelFriendRequest);
 router.post("/unfriend", friendshipController.unfriend);
 router.get("/checkfriend/:senderId/:receiverId", friendshipController.checkFriendRequestStatus);
 router.get("/friend-requests/:userId", friendshipController.getFriendRequests);
+router.get("/getfriend/:userId", friendshipController.getFriendsList);
 
 module.exports = router;
