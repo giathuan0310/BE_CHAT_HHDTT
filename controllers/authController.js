@@ -4,6 +4,11 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sendVerificationEmail = require("../service/sendEmail");
 const crypto = require("crypto");
+const { OAuth2Client } = require("google-auth-library");
+
+
+const client_id= process.env.GG_CLIENT_ID;
+const client = new OAuth2Client(client_id);
 
 
 let refreshTokens = [];
@@ -59,74 +64,79 @@ const authController={
     // },
 
     // Register
-registerUser: async (req, res) => {
-  try {
-    // const { username, email, password } = req.body;
-    const { phone, email, password,username } = req.body;
+    registerUser: async (req, res) => {
+      try {
+        const { phone, email, password, username } = req.body;
+    
+        // 1. Kiểm tra số điện thoại đã tồn tại
+        const existingPhone = await User.findOne({ phone });
+        if (existingPhone) {
+          return res.status(400).json({ message: "Số điện thoại đã tồn tại." });
+        }
+        // 2. Ràng buộc số điện thoại (10-11 ký tự số)
+        const phoneRegex = /^\d{10,11}$/;
+        if (!phoneRegex.test(phone)) {
+          return res.status(400).json({ message: "Số điện thoại phải có từ 10 đến 11 ký tự số." });
+        }
+        // 3. Kiểm tra email đã tồn tại
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+          return res.status(400).json({ message: "Email đã tồn tại." });
+        }
 
-    // 1. Kiểm tra email đã tồn tại
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email đã tồn tại." });
-    }
-
-     // Kiểm tra phone đã tồn tại
-     const existingPhone = await User.findOne({ phone });
-     if (existingPhone) {
-       return res.status(400).json({ message: "Số điện thoại đã tồn tại." });
-     }
-
-
-     // Tạo username mặc định nếu không cung cấp
-    const generatedUsername = username || `Khach_${Date.now()}`;
-
-
-    // 2. Mã hóa password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // 3. Tạo user mới
-    // const newUser = new User({
-    //   username,
-    //   email,
-    //   password: hashedPassword,
-    // });
-
-    const newUser = new User({
-      phone,
-      email,
-      password: hashedPassword,
-      username: generatedUsername,
-    });
-    // 4. Lưu vào database
-    const user = await newUser.save();
-
-    // 5. Tạo token xác minh email
-    const emailToken = jwt.sign(
-      { id: user._id },
-      process.env.JWT_EMAIL_SECRET,
-      { expiresIn: "1h" }
-    );
-
-    // 6. Tạo link xác minh
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${emailToken}`;
-
-    // 7. Gửi email xác minh
-    try {
-      await sendVerificationEmail(user.email, verificationUrl);
-      res.status(200).json({
-        message: "Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.",
-      });
-    } catch (err) {
-      await User.findByIdAndDelete(user._id); // Xóa user nếu gửi email thất bại
-      res.status(500).json({
-        message: "Gửi email xác minh thất bại. Vui lòng thử lại.",
-      });
-    }
-  } catch (err) {
-    res.status(500).json(err);
-  }
-},
+        // 4. Ràng buộc định dạng email (chỉ cho phép gmail)
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+        if (!emailRegex.test(email)) {
+          return res.status(400).json({ message: "Email sai  định dạng " });
+        }
+    
+       
+    
+        // 5. Tạo username mặc định nếu không cung cấp
+        const generatedUsername = username || `Khach_${Date.now()}`;
+    
+        // 6. Mã hóa password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+    
+        // 7. Tạo user mới
+        const newUser = new User({
+          phone,
+          email,
+          password: hashedPassword,
+          username: generatedUsername,
+        });
+    
+        // 8. Lưu vào database
+        const user = await newUser.save();
+    
+        // 9. Tạo token xác minh email
+        const emailToken = jwt.sign(
+          { id: user._id },
+          process.env.JWT_EMAIL_SECRET,
+          { expiresIn: "1h" }
+        );
+    
+        // 10. Tạo link xác minh
+        const verificationUrl = `${process.env.CLIENT_URL}/verify-email/${emailToken}`;
+    
+        // 11. Gửi email xác minh
+        try {
+          await sendVerificationEmail(user.email, verificationUrl);
+          res.status(200).json({
+            message: "Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.",
+          });
+        } catch (err) {
+          await User.findByIdAndDelete(user._id); // Xóa user nếu gửi email thất bại
+          res.status(500).json({
+            message: "Gửi email xác minh thất bại. Vui lòng thử lại.",
+          });
+        }
+      } catch (err) {
+        res.status(500).json(err);
+      }
+    },
+    
 
    
     // Verify email
@@ -183,50 +193,47 @@ verifyEmail: async (req, res) => {
     },
     
     //Login
-    loginUser: async(req,res)=>{
-      try {
-          const user = await User.findOne({ email: req.body.email });
-          if (!user) {
-              return res.status(404).json("Incorrect email!");
-          }
+   // Login
+   loginUser: async (req, res) => {
+    try {
+        const user = await User.findOne({ email: req.body.email });
+        if (!user) {
+            return res.status(401).json({ message: "Email Không chính xác!" });  // Chuyển từ 404 thành 401
+        }
   
-         
-          if (!user.isVerified) {
-            console.log("isVerified:", user.isVerified);  // Thêm dòng này để kiểm tra
-              return res.status(400).json({message:"Email chưa được xác minh. Vui lòng kiểm tra email của bạn để xác minh tài khoản."});
-          }
-          
-          user.isOnline = true;
-          await user.save();
-          // Compare password
-          const validPassword = await bcrypt.compare(
-              req.body.password,
-              user.password
-          );
-          if (!validPassword) {
-              return res.status(404).json("Incorrect password");
-          }
+        // Kiểm tra mật khẩu
+        const validPassword = await bcrypt.compare(req.body.password, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ message: "Password không chính xác!" });  // Chuyển từ 404 thành 401
+        }
   
-          if (user && validPassword) {
-              const accessToken = authController.generateAccessToken(user);
-              const refreshToken = authController.generateRefreshToken(user);
-              
-              // Save refresh token in cookies
-              res.cookie("refreshToken", refreshToken, {
-                  httpOnly: true,
-                  secure: false,
-                  path: "/",
-                  sameSite: "strict",
-              });
+        // Đánh dấu người dùng là online và lưu
+        user.isOnline = true;
+        await user.save();
   
-              // Return user data without password
-              const { password, ...others } = user._doc;
-              res.status(200).json({ ...others, accessToken });
-          }
-      } catch (err) {
-          res.status(500).json(err);
-      }
+        // Tạo token và refresh token
+        const accessToken = authController.generateAccessToken(user);
+        const refreshToken = authController.generateRefreshToken(user);
+  
+        // Lưu refresh token vào cookies
+        res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            secure: false,
+            path: "/",
+            sameSite: "strict",
+        });
+  
+        // Trả về thông tin người dùng mà không có mật khẩu
+        const { password, ...others } = user._doc;
+        res.status(200).json({ ...others, accessToken });
+  
+    } catch (err) {
+        console.error("Login Error:", err);  // Log lỗi để dễ dàng debug
+        res.status(500).json({ message: "Đã có lỗi từ server, vui lòng thử lại!" });
+    }
   },
+  
+
   
 
     requestRefreshToken: async (req, res) => {
