@@ -70,7 +70,7 @@ const chatSocket = (io) => {
 
         // Update conversation
         await Conversation.findByIdAndUpdate(conversationId, {
-          latestmessage: text,
+          latestmessage: text || messageType,
           lastMessageSenderId: senderId,
           lastMessageId: savedMessage._id,
           lastMessageTime: new Date(),

@@ -13,8 +13,8 @@ const http = require("http");
 const chatSocket = require("./chat-socket/chat-sockets");
 
 dotenv.config();
-
 const app = express();
+
 
 // Kết nối MongoDB với async/await
 const connectDB = async () => {

@@ -187,6 +187,50 @@ const replyToMessage = async (req, res) => {
   }
 };
 
+// Upload File (Hình ảnh, Video, File)
+// const { cloudinary, upload } = require("../config/cloudConfig");
+
+const uploadFile = async (req, res) => {
+  console.log("File nhận được:", req.file);
+  console.log("Body:", req.body); // Kiểm tra conversationId, senderId
+
+  let imageUrl = null;
+  let videoUrl = null;
+  let fileUrl = null;
+
+  try {
+    if (req.file.mimetype.startsWith("image")) {
+      imageUrl = req.file.path || req.file.url || req.file.location;
+    } else if (req.file.mimetype.startsWith("video")) {
+      videoUrl = req.file.path || req.file.url || req.file.location;
+    } else {
+      fileUrl = req.file.path || req.file.url || req.file.location;
+    }
+
+    // Tạo object response chỉ chứa giá trị không null
+    const response = {
+      success: true,
+      fileName: req.file.originalname,
+    };
+
+    if (imageUrl) response.imageUrl = imageUrl;
+    if (videoUrl) response.videoUrl = videoUrl;
+    if (fileUrl) response.fileUrl = fileUrl;
+
+    return res.status(200).json(response);
+  } catch (error) {
+    console.error("Lỗi khi upload file:", JSON.stringify(error, null, 2));
+    return res.status(500).json({
+      success: false,
+      message: "Có lỗi xảy ra khi upload file",
+      error: error.toString(), // Trả về lỗi dạng string cho client dễ đọc
+    });
+  }
+};
+
+
+
+
 module.exports = {
   getMessagesByConversation,
   createMessage,
@@ -194,4 +238,6 @@ module.exports = {
   deleteMessageFrom,
   recallMessage,
   replyToMessage,
+  uploadFile,
+ 
 };
