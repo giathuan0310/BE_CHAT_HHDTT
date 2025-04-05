@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const messageController = require("../controllers/messageController");
+const { upload } = require("../middlewares/multerConfig");
 
 // Lấy danh sách message theo conversationId
 router.get("/get/:conversationId", messageController.getMessagesByConversation);
@@ -19,5 +20,8 @@ router.put('/deletefrom/:messageId', messageController.deleteMessageFrom);
 
 // Reply message
 router.put('/reply', messageController.replyToMessage);
+
+//Upload file, video, image
+router.post("/upload", upload.single("file"), messageController.uploadFile);
 
 module.exports = router;
