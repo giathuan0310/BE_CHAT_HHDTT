@@ -42,6 +42,22 @@ const ConversationSchema = new mongoose.Schema(
       default: "",
     },
     lastMessageTime: { type: Date, default: Date.now },
+    deleteBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    leftMembers: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        leftAt: { type: Date, default: Date.now },
+        lastMessageId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Message",
+        },
+      },
+    ],
   },
   {
     timestamps: true,

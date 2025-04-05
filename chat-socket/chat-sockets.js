@@ -75,6 +75,7 @@ const chatSocket = (io) => {
           lastMessageId: savedMessage._id,
           lastMessageTime: new Date(),
           unreadCounts: updatedUnreadCounts,
+          $set: { deleteBy: [] },
         });
         let replyMessage = null;
         if (replyTo) {
@@ -122,20 +123,54 @@ const chatSocket = (io) => {
         console.error("Mark as seen error:", err);
       }
     });
-    socket.on("deleteChat", async ({ conversationId }) => {
+    socket.on("deleteChat", async ({ conversationId, userId }) => {
       try {
-        // Xóa conversation trong DB
-        await Conversation.findByIdAndDelete(conversationId);
-        // Xóa tất cả tin nhắn thuộc conversation
-        await Message.deleteMany({ conversationId });
-        console.log("Deleted chat: ", conversationId);
+        // Xóa cuộc trò chuyện trong DB
+        await Conversation.updateOne(
+          { _id: conversationId },
+          { $addToSet: { deleteBy: userId } } // Thêm vào mảng deleteBy nếu chưa có
+        );
         // Phát thông báo tới tất cả client để cập nhật UI
-        io.emit("chatDeleted", { conversationId });
+        io.emit("chatDeleted", { conversationId, userId });
       } catch (err) {
         console.error("Delete chat error:", err);
       }
     });
-    
+
+    // Rời nhóm
+    socket.on("leaveGroup", async ({ conversationId, userId }) => {
+      try {
+        const lastMessage = await Message.findOne({ conversationId })
+          .sort({ createdAt: -1 })
+          .select("_id");
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            $pull: { members: userId }, // Xóa khỏi danh sách thành viên
+            $push: {
+              leftMembers: {
+                userId,
+                leftAt: new Date(),
+                lastMessageId: lastMessage._id,
+              },
+            }, // Thêm vào danh sách rời nhóm
+          }
+        );
+
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
+        io.emit("groupUpdated", { conversationId });
+
+        console.log(`Người dùng ${userId} đã rời nhóm ${conversationId}`);
+      } catch (error) {
+        console.error("Lỗi khi rời nhóm:", error);
+      }
+    });
+
+    socket.on("messageUpdated", async ({ conversationId }) => {
+      // Gửi thông báo cập nhật tin nhắn tới tất cả thành viên trong đoạn chat
+      io.emit("refreshMessages", { conversationId });
+      console.log("Message updated in conversation: " + conversationId);
+    });
 
     // Lắng nghe khi user xem tin nhắn (seen)
     socket.on("messageSeen", async ({ messageId, userId }) => {
