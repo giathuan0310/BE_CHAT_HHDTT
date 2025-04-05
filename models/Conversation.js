@@ -7,11 +7,13 @@ const ConversationSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    lastMessageSenderId: { // Thêm trường này
+    lastMessageSenderId: {
+      // Thêm trường này
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
-    lastMessageId: { // Thêm trường này
+    lastMessageId: {
+      // Thêm trường này
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message",
     },
@@ -52,6 +54,17 @@ const ConversationSchema = new mongoose.Schema(
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         leftAt: { type: Date, default: Date.now },
+        lastMessageId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Message",
+        },
+      },
+    ],
+    addMembers: [
+      {
+        userId: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        addBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        addedAt: { type: Date, default: Date.now },
         lastMessageId: {
           type: mongoose.Schema.Types.ObjectId,
           ref: "Message",

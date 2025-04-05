@@ -1,33 +1,38 @@
 {
-  "name": "backend",
+  "name": "be_chathhdtt",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giathuan0310/BE_ChatHHDTT.git"
+  },
+  "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/giathuan0310/BE_ChatHHDTT/issues"
+  },
+  "homepage": "https://github.com/giathuan0310/BE_ChatHHDTT#readme",
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.779.0",
-    "aws-sdk": "^2.1692.0",
+    "@aws-sdk/client-s3": "^3.782.0",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
-    "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "fs": "^0.0.1-security",
+    "express": "^5.1.0",
     "google-auth-library": "^9.15.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.9.5",
+    "mongoose": "^8.13.2",
     "multer": "^1.4.5-lts.2",
     "multer-s3": "^3.0.1",
     "multer-storage-cloudinary": "^4.0.0",
     "nodemailer": "^6.10.0",
-    "server": "^1.0.41",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io": "^4.8.1"
   }
 }
