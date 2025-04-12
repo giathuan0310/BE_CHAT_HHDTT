@@ -22,34 +22,63 @@ const updateUser = async (req, res) => {
     const { id } = req.params;
     const { username, phone, password } = req.body;
 
-    // Kiểm tra nếu có file avatar được upload
+    // ======= Kiểm tra không rỗng =======
+    if (!username ) {
+      return res.status(400).json({ error: "Username không được để trống" });
+    }
+    if (!phone) {
+      return res.status(400).json({ error: "Số điện thoại không được để trống" });
+    }
+
+    // ======= Regex kiểm tra =======
+    const usernameRegex = /^[a-zA-ZÀ-ỹ\s]+$/; // tiếng việt có dấu
+    const phoneRegex = /^0\d{9}$/;
+    const passwordRegex = /^.{6,}$/;              // Mật khẩu từ 6 ký tự trở lên
+
+    if (!usernameRegex.test(username)) {
+      return res.status(400).json({
+        error: "Tên đăng nhập phải từ 3 đến 20 ký tự, chỉ gồm chữ cái (có hoặc không dấu)"
+      });
+    }
+
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({ error: "Số điện thoại không hợp lệ (bắt đầu bằng 0) gồm 10 kí tự" });
+    }
+
+    if (password && !passwordRegex.test(password)) {
+      return res.status(400).json({ error: "Mật khẩu phải từ 6 ký tự trở lên" });
+    }
+
+    // ======= Kiểm tra trùng số điện thoại =======
+    const existingUser = await User.findOne({ phone });
+    if (existingUser && existingUser._id.toString() !== id) {
+      return res.status(400).json({ error: "Số điện thoại đã được sử dụng bởi người dùng khác." });
+    }
+    // ====== Cập nhật ======
     let updatedFields = {
       username,
       phone,
     };
 
-    // Kiểm tra nếu có mật khẩu, mã hóa mật khẩu trước khi lưu
     if (password) {
-      const salt = await bcrypt.genSalt(10); // Tạo salt với số vòng lặp là 10
-      const hashedPassword = await bcrypt.hash(password, salt); // Mã hóa mật khẩu
-      updatedFields.password = hashedPassword; // Lưu mật khẩu đã mã hóa
-     
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      updatedFields.password = hashedPassword;
     }
 
-
     if (req.file) {
-      updatedFields.avatar = req.file.path; // Lưu đường dẫn ảnh từ Cloudinary
+      updatedFields.avatar = req.file.path;
     }
 
     const updatedUser = await User.findByIdAndUpdate(id, updatedFields, { new: true });
 
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
     res.status(200).json(updatedUser);
   } catch (err) {
-    console.error("Error updating user:", err);
+    console.error("Lỗi khi cập nhật user:", err);
     res.status(500).json({ error: err.message });
   }
 };

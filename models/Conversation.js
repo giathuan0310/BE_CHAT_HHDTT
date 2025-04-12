@@ -62,7 +62,7 @@ const ConversationSchema = new mongoose.Schema(
     ],
     addMembers: [
       {
-        userId: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
         addBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         addedAt: { type: Date, default: Date.now },
         lastMessageId: {
@@ -71,6 +71,7 @@ const ConversationSchema = new mongoose.Schema(
         },
       },
     ],
+
   },
   {
     timestamps: true,

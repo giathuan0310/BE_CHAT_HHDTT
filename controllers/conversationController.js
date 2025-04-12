@@ -76,9 +76,71 @@ const getUserConversationsWithMessagesSearch = async (req, res) => {
   }
 };
 
+//Thêm thành viên mới vào nhóm chat 
+const updateConversationMembers = async (req, res) => {
+  try {
+    const { members, addBy, lastMessageId } = req.body;
+    const conversationId = req.params.id;
+    
+    console.log("conversationId chat:", conversationId);
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Không tìm thấy nhóm" });
+    }
+
+    // Lọc ra các ID chưa có trong nhóm
+    const currentMemberIds = conversation.members.map((m) => m.toString());
+    const newMembers = members.filter((id) => !currentMemberIds.includes(id));
+
+    const updatedConversation = await Conversation.findByIdAndUpdate(
+      conversationId,
+      {
+        $addToSet: { members: { $each: newMembers } },
+        $push: {
+          addMembers: {
+            userId: newMembers,
+            addBy: addBy,
+            lastMessageId: lastMessageId || null,
+          },
+        },
+      },
+      { new: true }
+    );
+
+    res.status(200).json(updatedConversation);
+  } catch (err) {
+    console.error("Lỗi cập nhật nhóm:", err);
+    res.status(500).json({ message: "Lỗi cập nhật nhóm", error: err });
+  }
+};
+// Lấy thông tin của một conversation theo ID
+const getConversationById = async (req, res) => {
+  try {
+    const conversationId = req.params.id;
+   
+    const conversation = await Conversation.findById(conversationId)
+      .populate("members", "username avatar isOnline") // Lấy thông tin user trong nhóm
+      .populate("lastMessageSenderId", "username avatar")
+      .populate("lastMessageId");
+
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    res.status(200).json(conversation);
+  } catch (err) {
+    console.error("Error fetching conversation:", err);
+    res.status(500).json({ message: "Error fetching conversation", error: err });
+  }
+};
+
 
 module.exports = {
   createConversation,
   getUserConversationsWithMessages,
-  getUserConversationsWithMessagesSearch
+  getUserConversationsWithMessagesSearch,
+  updateConversationMembers,
+  getConversationById,
 };

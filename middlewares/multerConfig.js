@@ -24,7 +24,31 @@ const upload = multer({
             cb(null, `uploads/${Date.now()}_${file.originalname}`);
         },
     }),
-    limits: { fileSize: 100 * 1024 * 1024 }, // Giới hạn file 100MB
+    limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = [
+            "text/plain",
+            "image/jpeg",
+            "image/png",
+            "image/jpg",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "video/mp4",
+            "application/x-zip-compressed",
+            "application/x-compressed"
+        ];
+
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error("File type not allowed"), false);
+        }
+    }
 });
 
 module.exports = { upload };

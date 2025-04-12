@@ -158,13 +158,52 @@ const chatSocket = (io) => {
         );
 
         // Phát sự kiện cập nhật UI cho các thành viên còn lại
-        io.emit("groupUpdated", { conversationId });
+        io.emit("groupUpdated", { conversationId});
 
         console.log(`Người dùng ${userId} đã rời nhóm ${conversationId}`);
       } catch (error) {
         console.error("Lỗi khi rời nhóm:", error);
       }
     });
+    //Thêm thành viên vào nhóm
+    socket.on("addMembersToGroup", async ({ conversationId, newMemberIds, addedBy }) => {
+      try {
+        const lastMessage = await Message.findOne({ conversationId })
+          .sort({ createdAt: -1 })
+          .select("_id");
+
+        const currentTime = new Date();
+      
+
+        // Tạo danh sách các thành viên được thêm kèm thông tin
+        const addMembersData = newMemberIds.map((id) => ({
+          userId: id,
+          addBy: addedBy,
+          lastMessageId: lastMessage ? lastMessage._id : null,
+          addedAt: new Date(),
+        }));
+
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            $addToSet: { members: { $each: newMemberIds } },
+            $push: {
+              addMembers: { $each: addMembersData }, // thêm danh sách nhiều người
+            },
+          }
+        );
+        console.log("Thêm thành viên vào nhóm thành công:", addMembersData);
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
+        io.emit("groupUpdatedAdd", { conversationId , newMembers: addMembersData });
+   
+
+      } catch (error) {
+        console.error("Lỗi khi thêm thành viên vào nhóm:", error);
+      }
+    });
+
+
+
 
     socket.on("messageUpdated", async ({ conversationId }) => {
       // Gửi thông báo cập nhật tin nhắn tới tất cả thành viên trong đoạn chat

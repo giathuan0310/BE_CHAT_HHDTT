@@ -268,12 +268,34 @@ verifyEmail: async (req, res) => {
 
 
 //LOG OUT
-logOut: async (req, res) => {
-  //Clear cookies when user logs out
-  refreshTokens = refreshTokens.filter((token) => token !== req.body.token);
-  res.clearCookie("refreshToken");
-  res.status(200).json("Logged out successfully!");
-},
+  // LOG OUT
+  logOut: async (req, res) => {
+    try {
+      const { id } = req.body; // Lấy đúng id từ body
+      console.log("ID nhận từ auth:", id);
+
+      const user = await User.findById(id); // Tìm user theo ID
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.isOnline = false;
+      await user.save();
+
+      console.log("User sau khi update:", user);
+
+      // Có thể thêm xử lý xóa refreshToken nếu cần
+      // refreshTokens = refreshTokens.filter((token) => token !== req.body.token);
+      // res.clearCookie("refreshToken");
+
+      return res.status(200).json("Logged out successfully!");
+    } catch (error) {
+      console.error("Lỗi trong logOut:", error);
+      return res.status(500).json({ message: "Internal Server Error" });
+    }
+  },
+
 
 // Gửi yêu cầu khôi phục mật khẩu
 

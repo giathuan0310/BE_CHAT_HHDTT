@@ -11,7 +11,7 @@ router.post("/login",authController.loginUser);
 router.post("/refresh", authController.requestRefreshToken);
 
 //Logout
-router.post("/logout",middlewareController.verifyToken,authController.logOut)
+router.post("/logout",authController.logOut)
 // Xác minh email
 router.get("/verify/:token", authController.verifyEmail);
 
