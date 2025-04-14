@@ -22,6 +22,6 @@ router.put('/deletefrom/:messageId', messageController.deleteMessageFrom);
 router.put('/reply', messageController.replyToMessage);
 
 //Upload file, video, image
-router.post("/upload", upload.single("file"), messageController.uploadFile);
+router.post("/upload", upload.array("files", 10), messageController.uploadFile);
 
 module.exports = router;

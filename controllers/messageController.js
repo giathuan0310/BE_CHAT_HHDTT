@@ -188,34 +188,41 @@ const replyToMessage = async (req, res) => {
 };
 
 // Upload File (Hình ảnh, Video, File)
-// const { cloudinary, upload } = require("../config/cloudConfig");
 
 const uploadFile = async (req, res) => {
-  console.log("File nhận được:", req.file);
+  console.log("Files nhận được:", req.files);
   console.log("Body:", req.body); // Kiểm tra conversationId, senderId
 
-  let imageUrl = null;
-  let videoUrl = null;
-  let fileUrl = null;
+  const imageUrls = [];
+  const videoUrls = [];
+  const fileUrls = [];
 
   try {
-    if (req.file.mimetype.startsWith("image")) {
-      imageUrl = req.file.path || req.file.url || req.file.location;
-    } else if (req.file.mimetype.startsWith("video")) {
-      videoUrl = req.file.path || req.file.url || req.file.location;
-    } else {
-      fileUrl = req.file.path || req.file.url || req.file.location;
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Không có file nào được upload",
+      });
     }
 
-    // Tạo object response chỉ chứa giá trị không null
+    req.files.forEach((file) => {
+      const fileLocation = file.location || file.path || file.url;
+
+      if (file.mimetype.startsWith("image/")) {
+        imageUrls.push(fileLocation);
+      } else if (file.mimetype.startsWith("video/")) {
+        videoUrls.push(fileLocation);
+      } else {
+        fileUrls.push(fileLocation);
+      }
+    });
+
     const response = {
       success: true,
-      fileName: req.file.originalname,
+      imageUrls,
+      videoUrls,
+      fileUrls,
     };
-
-    if (imageUrl) response.imageUrl = imageUrl;
-    if (videoUrl) response.videoUrl = videoUrl;
-    if (fileUrl) response.fileUrl = fileUrl;
 
     return res.status(200).json(response);
   } catch (error) {
@@ -223,7 +230,7 @@ const uploadFile = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Có lỗi xảy ra khi upload file",
-      error: error.toString(), // Trả về lỗi dạng string cho client dễ đọc
+      error: error.toString(),
     });
   }
 };
