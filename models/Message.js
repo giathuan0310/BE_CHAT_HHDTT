@@ -10,11 +10,14 @@ const MessageSchema = new mongoose.Schema(
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: function () {
+        return this.messageType !== "system";
+      },
     },
+
     messageType: {
       type: String,
-      enum: ["text", "image", "video", "file", "icon"],
+      enum: ["text", "image", "video", "file", "icon", "system"],
       required: true,
     },
     text: {

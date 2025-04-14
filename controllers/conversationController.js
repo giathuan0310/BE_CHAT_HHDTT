@@ -135,6 +135,42 @@ const getConversationById = async (req, res) => {
     res.status(500).json({ message: "Error fetching conversation", error: err });
   }
 };
+// Tạo nhóm từ conversation có lưu ảnh
+const createConversationWithImage = async (req, res) => {
+  try {
+    const { members, isGroup, name } = req.body;
+
+    // Parse lại members nếu là JSON string
+    let parsedMembers = [];
+    try {
+      parsedMembers = JSON.parse(members);
+      if (!Array.isArray(parsedMembers)) throw new Error("Members must be an array.");
+    } catch (err) {
+      return res.status(400).json({ message: "Invalid members format. Must be a JSON array." });
+    }
+
+    // Kiểm tra nếu là nhóm nhưng thiếu tên
+    if (isGroup === "true" && !name) {
+      return res.status(400).json({ message: "Group name is required." });
+    }
+
+    const groupAvatar = req.file ? req.file.path : ""; // Đường dẫn ảnh Cloudinary
+
+    const newConversation = new Conversation({
+      members: parsedMembers,
+      isGroup: isGroup === "true", // Vì FormData gửi lên dưới dạng chuỗi
+      name: isGroup === "true" ? name : undefined,
+      groupAvatar,
+    });
+
+    const savedConversation = await newConversation.save();
+    res.status(201).json(savedConversation);
+  } catch (err) {
+    console.error("❌ Error creating conversation:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 
 
 module.exports = {
@@ -143,4 +179,5 @@ module.exports = {
   getUserConversationsWithMessagesSearch,
   updateConversationMembers,
   getConversationById,
+  createConversationWithImage,
 };

@@ -71,6 +71,15 @@ const ConversationSchema = new mongoose.Schema(
         },
       },
     ],
+    createGroup: {
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
+      createAt: { type: Date, default: Date.now },
+      lastMessageId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message",
+      },
+    }
+    
 
   },
   {
