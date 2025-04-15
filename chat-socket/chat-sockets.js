@@ -136,6 +136,23 @@ const chatSocket = (io) => {
         console.error("Delete chat error:", err);
       }
     });
+    socket.on("deleteChatWithMe", async ({ conversationId, userId }) => {
+      try {
+        // Xóa cuộc trò chuyện trong DB
+        await Conversation.updateOne(
+          { _id: conversationId },
+          { $addToSet: { deleteBy: userId } } // Thêm vào mảng deleteBy nếu chưa có
+        );
+        await Message.updateMany(
+          { conversationId },
+          { $addToSet: { deletedFrom: userId } }
+        );
+        // Phát thông báo tới tất cả client để cập nhật UI
+        io.emit("chatDeleted", { conversationId, userId });
+      } catch (err) {
+        console.error("Delete chat error:", err);
+      }
+    });
 
     // Rời nhóm
     socket.on("leaveGroup", async ({ conversationId, userId }) => {
@@ -154,11 +171,12 @@ const chatSocket = (io) => {
                 lastMessageId: lastMessage._id,
               },
             }, // Thêm vào danh sách rời nhóm
+            lastMessageId: lastMessage ? lastMessage._id : null,
           }
         );
 
         // Phát sự kiện cập nhật UI cho các thành viên còn lại
-        io.emit("groupUpdated", { conversationId});
+        io.emit("groupUpdated", { conversationId, leftMembers: {userId,leftAt,lastMessageId : lastMessage._id} });
 
         console.log(`Người dùng ${userId} đã rời nhóm ${conversationId}`);
       } catch (error) {
@@ -190,6 +208,7 @@ const chatSocket = (io) => {
             $push: {
               addMembers: { $each: addMembersData }, // thêm danh sách nhiều người
             },
+            lastMessageId: lastMessage ? lastMessage._id : null,
           }
         );
         console.log("Thêm thành viên vào nhóm thành công:", addMembersData);
