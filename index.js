@@ -3,18 +3,17 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
-const authRoute= require("./routes/auth");
+const authRoute = require("./routes/auth");
 const conversationRoute = require("./routes/conversationRoute");
 const messageRoute = require("./routes/messageRoute");
 const userRoute = require("./routes/userRoute");
 const friendshipRoute = require("./routes/friendshipRoute");
-const http = require("http"); 
+const http = require("http");
 
 const chatSocket = require("./chat-socket/chat-sockets");
 
 dotenv.config();
 const app = express();
-
 
 // Kết nối MongoDB với async/await
 const connectDB = async () => {
@@ -37,15 +36,10 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 
-
-
-app.use(cors({ origin: ['http://localhost:3000', 'http://localhost:3001','http://localhost:3002'] }));
-
-
 //Router
-app.use("/v1/auth",authRoute);
-app.use("/conversations",conversationRoute);
-app.use("/messages",messageRoute);
+app.use("/v1/auth", authRoute);
+app.use("/conversations", conversationRoute);
+app.use("/messages", messageRoute);
 app.use("/users", userRoute);
 app.use("/friends", friendshipRoute);
 app.use((req, res, next) => {
@@ -66,9 +60,8 @@ const io = new Server(server, {
 
 chatSocket(io);
 
+const PORT = process.env.PORT || 8004;
 
-const PORT = process.env.PORT ;
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
-

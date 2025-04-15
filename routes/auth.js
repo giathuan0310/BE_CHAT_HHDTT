@@ -1,17 +1,17 @@
 const authController = require("../controllers/authController");
 const middlewareController = require("../controllers/middlewareController");
 
-const router= require("express").Router();
+const router = require("express").Router();
 
-router.post("/register",authController.registerUser);
+router.post("/register", authController.registerUser);
 //Login
-router.post("/login",authController.loginUser);
+router.post("/login", authController.loginUser);
 
 //REFRESH TOKEN
 router.post("/refresh", authController.requestRefreshToken);
 
 //Logout
-router.post("/logout",authController.logOut)
+router.post("/logout", authController.logOut);
 // Xác minh email
 router.get("/verify/:token", authController.verifyEmail);
 
