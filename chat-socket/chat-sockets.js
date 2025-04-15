@@ -1,6 +1,8 @@
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
 
+const User = require("../models/User");
+
 const chatSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("New client connected: " + socket.id);
@@ -59,7 +61,7 @@ const chatSocket = (io) => {
         // Nếu có thành viên chưa nằm trong danh sách unreadCounts thì thêm vào
         conversation.members.forEach((memberId) => {
           if (
-            memberId.toString() !== senderId.toString() &&
+            memberId.toString() !== senderId?.toString() &&
             !updatedUnreadCounts.some(
               (uc) => uc.userId.toString() === memberId.toString()
             )
@@ -220,9 +222,46 @@ const chatSocket = (io) => {
         console.error("Lỗi khi thêm thành viên vào nhóm:", error);
       }
     });
+  
 
+    // Tạo nhóm
+    socket.on("createGroup", async ({ conversationId, userId }) => {
+      try {
+        console.log("userId:", userId);
+        const userNameFind = await User.findById(userId).select("username");
+        const name = userNameFind.username;
 
+        const lastMessage = new Message({
+          conversationId,
+          // senderId: userId,
+          messageType: "system",
+          text: `Nhóm đã được tạo bởi ${name}`,
+        });
+        await lastMessage.save(); // Lưu tin nhắn vào DB
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            createGroup: {
+              userId,
+              createdAt: new Date(),
+              lastMessageId: lastMessage._id,
 
+            },
+            lastMessageId: lastMessage._id,
+            lastMessageTime: new Date(),
+            lastMessageSenderId: userId,
+            latestmessage: `Nhóm đã được tạo bởi ${userNameFind}`,
+
+          }
+        );
+
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
+        io.emit("updatedCreate", { conversationId });
+        console.log("Nhóm đã được tạo thành công:", conversationId);
+      } catch (error) {
+        console.error("Lỗi khi thêm nhóm:", error);
+      }
+    });
 
     socket.on("messageUpdated", async ({ conversationId }) => {
       // Gửi thông báo cập nhật tin nhắn tới tất cả thành viên trong đoạn chat

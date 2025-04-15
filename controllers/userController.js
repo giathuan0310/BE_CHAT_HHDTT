@@ -31,7 +31,7 @@ const updateUser = async (req, res) => {
     }
 
     // ======= Regex kiểm tra =======
-    const usernameRegex = /^[a-zA-ZÀ-ỹ\s]+$/; // tiếng việt có dấu
+    const usernameRegex = /^[a-zA-ZÀ-ỹ]+(?:\s[a-zA-ZÀ-ỹ]+)*$/;
     const phoneRegex = /^0\d{9}$/;
     const passwordRegex = /^.{6,}$/;              // Mật khẩu từ 6 ký tự trở lên
 
