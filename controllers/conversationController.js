@@ -138,7 +138,7 @@ const getConversationById = async (req, res) => {
 // Tạo nhóm từ conversation có lưu ảnh
 const createConversationWithImage = async (req, res) => {
   try {
-    const { members, isGroup, name } = req.body;
+    const { members, isGroup, name, groupLeaderId } = req.body;
 
     // Parse lại members nếu là JSON string
     let parsedMembers = [];
@@ -161,6 +161,7 @@ const createConversationWithImage = async (req, res) => {
       isGroup: isGroup === "true", // Vì FormData gửi lên dưới dạng chuỗi
       name: isGroup === "true" ? name : undefined,
       groupAvatar,
+      groupLeader: groupLeaderId, //  Lưu trưởng nhóm vào DB
     });
 
     const savedConversation = await newConversation.save();

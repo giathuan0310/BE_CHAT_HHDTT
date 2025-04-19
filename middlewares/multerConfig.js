@@ -39,6 +39,7 @@ const upload = multer({
             "application/vnd.ms-powerpoint",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             "video/mp4",
+            "video/quicktime",
             "application/x-zip-compressed",
             "application/x-compressed"
         ];

@@ -162,6 +162,14 @@ const chatSocket = (io) => {
         const lastMessage = await Message.findOne({ conversationId })
           .sort({ createdAt: -1 })
           .select("_id");
+        const user = await User.findById(userId);
+        const lastMess = new Message({
+          conversationId,
+          // senderId: userId,
+          messageType: "system",
+          text: `${user.username} đã rời nhóm`,
+        });
+        await lastMess.save(); // Lưu tin nhắn vào DB
         await Conversation.updateOne(
           { _id: conversationId },
           {
@@ -173,15 +181,14 @@ const chatSocket = (io) => {
                 lastMessageId: lastMessage._id,
               },
             }, // Thêm vào danh sách rời nhóm
-            lastMessageId: lastMessage ? lastMessage._id : null,
+            lastMessageId: lastMess._id,
+            lastMessageTime: new Date(),
+            latestmessage: lastMess.text,
           }
         );
 
         // Phát sự kiện cập nhật UI cho các thành viên còn lại
-        io.emit("groupUpdated", {
-          conversationId,
-          leftMembers: { userId, leftAt, lastMessageId: lastMessage._id },
-        });
+        io.emit("groupUpdated", { conversationId});
 
         console.log(`Người dùng ${userId} đã rời nhóm ${conversationId}`);
       } catch (error) {
@@ -189,23 +196,47 @@ const chatSocket = (io) => {
       }
     });
     //Thêm thành viên vào nhóm
-    socket.on(
-      "addMembersToGroup",
-      async ({ conversationId, newMemberIds, addedBy }) => {
-        try {
-          const lastMessage = await Message.findOne({ conversationId })
-            .sort({ createdAt: -1 })
-            .select("_id");
+    socket.on("addMembersToGroup", async ({ conversationId, newMemberIds, addedBy }) => {
+      try {
+        const lastMessage = await Message.findOne({ conversationId })
+          .sort({ createdAt: -1 })
+          .select("_id");
+        const lastAddedUserId = newMemberIds[newMemberIds.length - 1];
+        const addedUser = await User.findById(lastAddedUserId);
+        const lastMess = new Message({
+          conversationId,
+          // senderId: userId,
+          messageType: "system",
+          text: `${addedUser.username} đã được thêm vào nhóm`,
+        });
+        await lastMess.save(); // Lưu tin nhắn vào DB
+      
 
-          const currentTime = new Date();
+        // Tạo danh sách các thành viên được thêm kèm thông tin
+        const addMembersData = newMemberIds.map((id) => ({
+          userId: id,
+          addBy: addedBy,
+          lastMessageId: lastMessage._id,
+          lastMessageTime: new Date(),
+          addedAt: new Date(),
+        }));
 
-          // Tạo danh sách các thành viên được thêm kèm thông tin
-          const addMembersData = newMemberIds.map((id) => ({
-            userId: id,
-            addBy: addedBy,
-            lastMessageId: lastMessage ? lastMessage._id : null,
-            addedAt: new Date(),
-          }));
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            $addToSet: { members: { $each: newMemberIds } },
+            $push: {
+              addMembers: { $each: addMembersData }, // thêm danh sách nhiều người
+            },
+            lastMessageId: lastMess._id,
+            latestmessage: lastMess.text,
+            lastMessageTime: new Date(),
+          }
+        );
+        console.log("Thêm thành viên vào nhóm thành công:", addMembersData);
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
+        io.emit("groupUpdatedAdd", { conversationId , newMembers: addMembersData });
+   
 
           await Conversation.updateOne(
             { _id: conversationId },
@@ -251,6 +282,7 @@ const chatSocket = (io) => {
               createdAt: new Date(),
               lastMessageId: lastMessage._id,
             },
+            groupLeader: userId, 
             lastMessageId: lastMessage._id,
             lastMessageTime: new Date(),
             lastMessageSenderId: userId,
@@ -271,6 +303,167 @@ const chatSocket = (io) => {
       io.emit("refreshMessages", { conversationId });
       console.log("Message updated in conversation: " + conversationId);
     });
+
+  
+    socket.on("kickMember", async ({ conversationId, targetUserId, byUserId }) => {
+      console.log("Kick member event received:", {
+        conversationId,
+        targetUserId,
+        byUserId,
+      });
+      try {
+        const conversation = await Conversation.findById(conversationId)
+          .populate("groupLeader")
+          .populate("groupDeputies");
+
+        if (!conversation) return;
+
+        const isLeader = String(conversation.groupLeader._id) === String(byUserId);
+        const isDeputy = conversation.groupDeputies.some(
+          deputy => String(deputy._id) === String(byUserId)
+        );
+        const isTargetLeader = String(conversation.groupLeader._id) === String(targetUserId);
+        const isTargetDeputy = conversation.groupDeputies.some(
+          deputy => String(deputy._id) === String(targetUserId)
+        );
+
+        // Không có quyền
+        if (!isLeader && !isDeputy) {
+          console.log("Không có quyền xóa thành viên");
+          return;
+        }
+
+        // Trưởng nhóm không thể tự xóa chính mình
+        if (isLeader && String(byUserId) === String(targetUserId)) {
+          console.log("Trưởng nhóm không thể tự xóa chính mình");
+          return;
+        }
+
+        // Phó nhóm không được xóa trưởng nhóm
+        if (isDeputy && isTargetLeader) {
+          console.log("Phó nhóm không được xóa trưởng nhóm");
+          return;
+        }
+
+        // Phó nhóm không được xóa phó nhóm khác
+        if (isDeputy && isTargetDeputy) {
+          console.log("Phó nhóm không được xóa phó nhóm khác");
+          return;
+        }
+
+        const user = await User.findById(targetUserId);
+        const lastMessage = await Message.findOne({ conversationId })
+          .sort({ createdAt: -1 })
+          .select("_id");
+
+        const systemMessage = new Message({
+          conversationId,
+          messageType: "system",
+          text: `${user.username} đã bị xóa khỏi nhóm`,
+        });
+
+        await systemMessage.save();
+
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            $pull: { members: targetUserId },
+            $push: {
+              leftMembers: {
+                userId: targetUserId,
+                leftAt: new Date(),
+                lastMessageId: lastMessage?._id || null,
+              },
+            },
+            lastMessageId: systemMessage._id,
+            lastMessageTime: new Date(),
+            latestmessage: systemMessage.text,
+          }
+        );
+
+        io.emit("groupUpdated", { conversationId });
+
+        console.log(`Người dùng ${targetUserId} đã bị xóa khỏi nhóm ${conversationId}`);
+      } catch (error) {
+        console.error("Lỗi khi xóa thành viên khỏi nhóm:", error);
+      }
+    });
+
+
+
+    socket.on("toggleDeputy", async ({ conversationId, targetUserId, byUserId }) => {
+      console.log("Toggle deputy event received:", {
+        conversationId,
+        targetUserId,
+        byUserId,
+      });
+      try {
+        const conversation = await Conversation.findById(conversationId)
+          .populate("groupLeader")
+          .populate("groupDeputies");
+
+        if (!conversation) return;
+
+        const isLeader = String(conversation.groupLeader._id) === String(byUserId);
+        if (!isLeader) {
+          console.log("Chỉ trưởng nhóm mới có quyền cấp/thu hồi quyền phó nhóm");
+          return;
+        }
+
+        const isDeputy = conversation.groupDeputies.some(
+          deputy => String(deputy._id) === String(targetUserId)
+        );
+
+        let actionMessage = "";
+
+        if (isDeputy) {
+          // Thu hồi quyền
+          await Conversation.updateOne(
+            { _id: conversationId },
+            { $pull: { groupDeputies: targetUserId } }
+          );
+          actionMessage = "đã bị thu hồi quyền phó nhóm";
+        } else {
+          // Cấp quyền
+          await Conversation.updateOne(
+            { _id: conversationId },
+            { $addToSet: { groupDeputies: targetUserId } }
+          );
+          actionMessage = "đã được cấp quyền phó nhóm";
+        }
+
+        const user = await User.findById(targetUserId);
+        const message = new Message({
+          conversationId,
+          messageType: "system",
+          text: `${user.username} ${actionMessage}`,
+        });
+
+        await message.save();
+
+        await Conversation.updateOne(
+          { _id: conversationId },
+          {
+            lastMessageId: message._id,
+            lastMessageTime: new Date(),
+            latestmessage: message.text,
+          }
+        );
+
+        io.emit("groupUpdatedToggleDeputy", { conversationId, targetUserId });
+
+        console.log(`${user.username} ${actionMessage}`);
+      } catch (error) {
+        console.error("Lỗi toggle quyền phó nhóm:", error);
+      }
+    });
+
+
+
+   
+
+
+
 
     // Lắng nghe khi user xem tin nhắn (seen)
     socket.on("messageSeen", async ({ messageId, userId }) => {

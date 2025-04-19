@@ -78,7 +78,24 @@ const ConversationSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: "Message",
       },
-    }
+    },
+    groupLeader: {
+      // Trưởng nhóm - 1 người
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    groupDeputies: [
+      // Nhóm phó - nhiều người
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    isDissolved: {
+      // Đánh dấu nhóm đã bị giải tán
+      type: Boolean,
+      default: false,
+    },
     
 
   },
