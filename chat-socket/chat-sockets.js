@@ -195,52 +195,64 @@ const chatSocket = (io) => {
     });
 
     // Rời nhóm
-    socket.on("leaveGroup", async ({ conversationId, userId }) => {
+    socket.on("leaveGroup", async ({ conversationId, userId, newLeaderId }) => {
       try {
         const lastMessage = await Message.findOne({ conversationId })
           .sort({ createdAt: -1 })
           .select("_id");
+    
         const user = await User.findById(userId);
         const lastMess = new Message({
           conversationId,
-          // senderId: userId,
           messageType: "system",
           text: `${user.username} đã rời nhóm`,
         });
-        await lastMess.save(); // Lưu tin nhắn vào DB
-        await Conversation.updateOne(
-          { _id: conversationId },
-          {
-            $pull: { members: userId }, // Xóa khỏi danh sách thành viên
-            $push: {
-              leftMembers: {
-                userId,
-                leftAt: new Date(),
-                lastMessageId: lastMessage._id,
-              },
-            }, // Thêm vào danh sách rời nhóm
-            lastMessageId: lastMess._id,
-            lastMessageTime: new Date(),
-            latestmessage: lastMess.text,
-          }
-        );
-
-        // Phát sự kiện cập nhật UI cho các thành viên còn lại
+        await lastMess.save();
+    
+        // Tạo update object để truyền vào updateOne
+        const updateObj = {
+          $pull: { members: userId },
+          $push: {
+            leftMembers: {
+              userId,
+              leftAt: new Date(),
+              lastMessageId: lastMessage?._id || null,
+            },
+          },
+          lastMessageId: lastMess._id,
+          lastMessageTime: new Date(),
+          latestmessage: lastMess.text,
+        };
+    
+        // Nếu có newLeaderId thì cập nhật lại nhóm trưởng
+        if (newLeaderId) {
+          updateObj.$set = { groupLeader: newLeaderId };
+        }
+    
+        await Conversation.updateOne({ _id: conversationId }, updateObj);
+    
+        // Phát sự kiện cho tất cả client
         io.emit("groupUpdated", {
-          conversationId, 
+          conversationId,
           latestmessage: lastMess.text,
           leftMembers: {
             userId,
             leftAt: new Date(),
-            lastMessageId: lastMessage._id,
+            lastMessageId: lastMessage?._id || null,
           },
-         });
-
-        console.log(`Người dùng ${userId} đã rời nhóm ${conversationId}`);
+          newLeaderId: newLeaderId || null,
+        });
+    
+        console.log(
+          `Người dùng ${userId} đã rời nhóm ${conversationId} ${
+            newLeaderId ? `(nhóm trưởng mới: ${newLeaderId})` : ""
+          }`
+        );
       } catch (error) {
         console.error("Lỗi khi rời nhóm:", error);
       }
     });
+    
 
     // Thêm thành viên vào nhóm
     socket.on("addMembersToGroup", async ({ conversationId, newMemberIds, addedBy }) => {
