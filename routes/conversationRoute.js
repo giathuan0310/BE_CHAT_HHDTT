@@ -9,5 +9,5 @@ router.get("/:userId/search", conversationController.getUserConversationsWithMes
 router.put("/:id", conversationController.updateConversationMembers);
 router.get("/get/:id", conversationController.getConversationById);
 router.post("/createwithimage", upload.single("groupAvatar"), conversationController.createConversationWithImage);
-
+router.put("/group/:id", upload.single("groupAvatar"), conversationController.updateGroup);
 module.exports = router;

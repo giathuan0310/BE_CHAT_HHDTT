@@ -172,6 +172,56 @@ const createConversationWithImage = async (req, res) => {
   }
 };
 
+const updateGroup = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    console.log("ID nhóm cần cập nhật:", id);
+    console.log("Tên nhóm mới:", name);
+
+    // ===== Kiểm tra không rỗng =====
+    if (!name) {
+      return res.status(400).json({ error: "Tên nhóm không được để trống" });
+    }
+
+    // ===== Regex kiểm tra tên nhóm =====
+    const nameRegex = /^[a-zA-ZÀ-ỹ]+(?:\s[a-zA-ZÀ-ỹ]+)*$/;
+    if (!nameRegex.test(name)) {
+      return res.status(400).json({
+        error: "Tên nhóm chỉ bao gồm chữ và khoảng trắng",
+      });
+    }
+
+    // ===== Tìm nhóm và kiểm tra isGroup =====
+    const group = await Conversation.findById(id);
+    if (!group || !group.isGroup) {
+      return res.status(404).json({ error: "Không tìm thấy nhóm hợp lệ" });
+    }
+
+    // ===== Chuẩn bị dữ liệu cập nhật =====
+    let updatedFields = { name };
+
+    if (req.file) {
+      updatedFields.groupAvatar = req.file.path;
+    }
+
+    const updatedGroup = await Conversation.findByIdAndUpdate(
+      id,
+      updatedFields,
+      { new: true }
+    )
+      .populate("members", "username avatar")
+      .populate("groupLeader", "username avatar")
+      .populate("groupDeputies", "username avatar");
+
+    res.status(200).json(updatedGroup);
+  } catch (err) {
+    console.error("Lỗi khi cập nhật nhóm:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 
 
 module.exports = {
@@ -181,4 +231,5 @@ module.exports = {
   updateConversationMembers,
   getConversationById,
   createConversationWithImage,
+  updateGroup,
 };
