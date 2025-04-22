@@ -1,7 +1,9 @@
 const Message = require("../models/Message");
 const Conversation = require("../models/Conversation");
+const FriendRequest = require("../models/FriendRequest");
 
 const User = require("../models/User");
+
 
 const chatSocket = (io) => {
   io.on("connection", (socket) => {
@@ -23,6 +25,43 @@ const chatSocket = (io) => {
           replyTo,
         } = data;
 
+        // Lấy conversation hiện tại
+        const conversation = await Conversation.findById(conversationId);
+
+
+        // Kiểm tra mối quan hệ bạn bè nếu là trò chuyện 1-1
+        let isFriend = true;
+        let receiverId = null;
+
+        if (!conversation.isGroup) {
+          receiverId = conversation.members.find(
+            (id) => id.toString() !== senderId.toString()
+          );
+
+          const friendRequest = await FriendRequest.exists({
+            $or: [
+              { senderId: senderId, receiverId: receiverId },
+              { senderId: receiverId, receiverId: senderId },
+            ],
+            status: "accepted",
+          });
+
+          isFriend = friendRequest !== null;
+          if (!isFriend) {
+            // Nếu không phải bạn bè, chỉ gửi tin hệ thống đến người gửi, không tạo tin nhắn mới
+            io.to(senderId).emit("nguoila", {
+              conversationId,
+              messageType: "system",
+              text: "❗Bạn chỉ có thể nhắn tin với người đã kết bạn.",
+              sender: null,
+              replyTo: null,
+              createdAt: new Date(),
+            });
+
+            return; // Ngắt tại đây, không tạo hoặc gửi message thật
+          }
+        }
+
         // Tạo tin nhắn mới trong DB
         const newMessage = new Message({
           conversationId,
@@ -38,8 +77,7 @@ const chatSocket = (io) => {
         });
 
         const savedMessage = await newMessage.save();
-        // Lấy conversation hiện tại
-        const conversation = await Conversation.findById(conversationId);
+       
 
         // Cập nhật unreadCounts
         const updatedUnreadCounts = conversation.unreadCounts.map((item) => {
@@ -266,11 +304,8 @@ const chatSocket = (io) => {
     // Tạo nhóm
     socket.on("createGroup", async ({ conversationId, userId }) => {
       try {
-        console.log("userId:", userId);
         const userNameFind = await User.findById(userId).select("username");
         const name = userNameFind.username;
-        console.log("name:", name);
-
         const lastMessage = new Message({
           conversationId,
           // senderId: userId,
@@ -399,7 +434,7 @@ const chatSocket = (io) => {
       }
     });
 
-
+//Phân quyền, thu hồi quyền phó nhóm
 
     socket.on("toggleDeputy", async ({ conversationId, targetUserId, byUserId }) => {
       console.log("Toggle deputy event received:", {
@@ -507,14 +542,250 @@ const chatSocket = (io) => {
           systemMessage, // gửi toàn bộ object message
         });
 
-        console.log(`✔️ Nhóm ${conversationId} đã bị giải tán bởi ${user.username}`);
+        console.log(`Nhóm ${conversationId} đã bị giải tán bởi ${user.username}`);
       } catch (err) {
-        console.error("❌ Lỗi khi giải tán nhóm:", err);
+        console.error("Lỗi khi giải tán nhóm:", err);
       }
     });
 
-   
 
+
+    // Gửi lời mời kết bạn
+    socket.on("send_friend_request", async (data, callback) => {
+      const { senderId, receiverId } = data;
+
+      try {
+        // Kiểm tra lời mời đang chờ ở cả 2 chiều
+        const existing = await FriendRequest.findOne({
+          status: "pending",
+          $or: [
+            { senderId, receiverId },
+            { senderId: receiverId, receiverId: senderId },
+          ],
+        });
+
+        if (existing) {
+          return callback({ success: false, message: "Đã có lời mời kết bạn đang chờ!" });
+        }
+
+        // Tạo lời mời mới
+        const request = await FriendRequest.create({ senderId, receiverId });
+     
+
+        // Gửi realtime đến receiver qua room có tên là userId
+        io.to(receiverId).emit("new_friend_request", request);
+
+        callback({ success: true, request });
+      } catch (err) {
+        console.error("Lỗi gửi lời mời:", err);
+        callback({ success: false, message: "Lỗi server!" });
+      }
+    });
+
+    socket.on("join_room", (userId) => {
+      socket.join(userId);
+      console.log("User đã join room:", userId);
+    });
+
+
+    // Chấp nhận lời mời
+    socket.on("accept_friend_request", async ({ senderId, receiverId }, callback) => {
+     
+
+      try {
+        const request = await FriendRequest.findOneAndUpdate(
+          { senderId, receiverId, status: "pending" },
+          { status: "accepted" },
+          { new: true }
+        );
+
+        if (request) {
+          // Gửi thông báo đến cả 2 người dùng
+          io.to(senderId).emit(`friend_request_accepted_${senderId}`, request);
+          io.to(receiverId).emit(`friend_request_accepted_${receiverId}`, request);
+
+          callback({ success: true, message: "Đã chấp nhận lời mời kết bạn.", request });
+        } else {
+          callback({ success: false, message: "Không tìm thấy lời mời phù hợp." });
+        }
+      } catch (err) {
+        console.error("Lỗi khi chấp nhận kết bạn:", err);
+        callback({ success: false, message: "Lỗi server khi chấp nhận lời mời." });
+      }
+    });
+
+
+    // Từ chối lời mời
+    socket.on("reject_friend_request", async ({ senderId, receiverId }, callback) => {
+      try {
+        const request = await FriendRequest.findOneAndUpdate(
+          { senderId, receiverId, status: "pending" },
+          { status: "rejected" },
+          { new: true }
+        );
+
+        if (request) {
+          // Gửi sự kiện cho cả người gửi và người nhận
+          io.to(senderId._id).emit("friend_request_rejected", {
+            receiverId: receiverId._id,
+            senderId: senderId._id
+          });
+
+          // 🔥 Gọi callback để thông báo cho client
+          callback({ success: true, message: "Từ chối kết bạn thành công." });
+        } else {
+          callback({ success: false, message: "Không tìm thấy lời mời phù hợp." });
+        }
+      } catch (err) {
+        console.error("Lỗi khi từ chối kết bạn:", err);
+        callback({ success: false, message: "Lỗi server khi từ chối kết bạn." });
+      }
+    });
+
+
+
+    // Thu hồi lời mời
+    socket.on("cancel_friend_request", async ({ senderId, receiverId }, callback) => {
+      try {
+        const result = await FriendRequest.findOneAndDelete({
+          senderId,
+          receiverId,
+          status: "pending",
+        });
+
+        if (!result) {
+          return callback({ success: false, message: "Không tìm thấy lời mời để thu hồi" });
+        }
+
+        // Có thể emit cho người nhận nếu đang online
+        const receiverSocketId = onlineUsers[receiverId];
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("friend_request_cancelled", {
+            senderId,
+          });
+        }
+
+        callback({ success: true, message: "Thu hồi thành công" });
+      } catch (error) {
+        console.error("Lỗi khi thu hồi lời mời:", error);
+        callback({ success: false, message: "Lỗi server!" });
+      }
+    });
+
+
+    // Hủy kết bạn
+    socket.on("unfriend", async ({ userId, friendId }, callback) => {
+      try {
+        await FriendRequest.findOneAndDelete({
+          $or: [
+            { senderId: userId, receiverId: friendId, status: "accepted" },
+            { senderId: friendId, receiverId: userId, status: "accepted" },
+          ],
+        });
+
+        callback({ success: true, message: "Đã hủy kết bạn thành công." });
+      } catch (error) {
+        console.error("Lỗi khi hủy kết bạn:", error);
+        callback({ success: false, message: "Không thể hủy kết bạn." });
+      }
+    });
+
+
+    // Kiểm tra trạng thái bạn bè
+    socket.on("check_friend_status", async ({ senderId, receiverId }, callback) => {
+      try {
+        const request = await FriendRequest.findOne({
+          $or: [
+            { senderId, receiverId },
+            { senderId: receiverId, receiverId: senderId },
+          ],
+        });
+
+        callback(request || null);
+      } catch (err) {
+        callback(null);
+      }
+    });
+
+    // Lấy danh sách lời mời kết bạn
+    socket.on("get_friend_requests", async ({ userId }, callback) => {
+      try {
+        const requests = await FriendRequest.find({
+          receiverId: userId,  status: "pending",
+        }).populate("senderId", "username avatar")
+          .populate("receiverId", "username avatar");
+       
+
+        callback({ success: true, friendRequests: requests });
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách lời mời:", error);
+        callback({ success: false, message: "Không thể lấy danh sách lời mời" });
+      }
+    });
+
+
+    // Lấy danh sách bạn bè
+    socket.on("get_friends_list", async ({ userId }, callback) => {
+
+      try {
+        // Lấy danh sách yêu cầu bạn bè đã được chấp nhận
+        const acceptedRequests = await FriendRequest.find({
+          $or: [
+            { senderId: userId, status: "accepted" },
+            { receiverId: userId, status: "accepted" },
+          ],
+        })
+          .populate("senderId receiverId", "username avatar"); // Populate username và avatar từ senderId và receiverId
+       
+
+        // Lọc bạn bè hợp lệ từ các yêu cầu chấp nhận
+        const friends = acceptedRequests.map((req) =>
+          req.senderId._id.toString() === userId ? req.receiverId : req.senderId
+        );
+
+        // Truy vấn lại bảng User để lấy thông tin username và avatar của bạn bè
+        const friendIds = friends.map(friend => friend._id);
+    
+        const users = await User.find({ _id: { $in: friendIds } }).select("username avatar");
+
+        // Ghép thông tin từ bảng User vào danh sách bạn bè
+        const friendsWithDetails = friends.map(friend => {
+          const user = users.find(u => u._id.toString() === friend._id.toString());
+          return user ? { ...friend.toObject(), ...user.toObject() } : null;
+        }).filter(friend => friend !== null); // Lọc bỏ phần tử null
+
+    
+
+        callback({ success: true, friends: friendsWithDetails });
+      } catch (error) {
+        console.error("Lỗi khi lấy danh sách bạn bè:", error);
+        callback({ success: false, message: "Không thể lấy danh sách bạn bè." });
+      }
+    });
+
+
+    // Lắng nghe sự kiện từ client
+    socket.on("search_user", async (data, callback) => {
+      const { phone } = data; // Nhận phone từ client
+
+      try {
+     
+
+        // Tìm người dùng theo phone
+        const user = await User.findOne({ phone }).select("_id username phone avatar");
+        
+
+        if (!user) {
+          return callback({ success: false, message: "Không tìm thấy người dùng" });
+        }
+
+        // Gửi kết quả về client
+        callback({ success: true, user });
+      } catch (error) {
+        console.error("Lỗi tìm kiếm người dùng:", error);
+        callback({ success: false, message: error.message });
+      }
+    });
 
 
 
