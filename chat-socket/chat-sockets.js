@@ -77,7 +77,7 @@ const chatSocket = (io) => {
         });
 
         const savedMessage = await newMessage.save();
-       
+
 
         // Cập nhật unreadCounts
         const updatedUnreadCounts = conversation.unreadCounts.map((item) => {
@@ -200,18 +200,22 @@ const chatSocket = (io) => {
         const lastMessage = await Message.findOne({ conversationId })
           .sort({ createdAt: -1 })
           .select("_id");
-    
         const user = await User.findById(userId);
         const lastMess = new Message({
           conversationId,
+          // senderId: userId,
           messageType: "system",
           text: `${user.username} đã rời nhóm`,
         });
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
         await lastMess.save();
-    
+
         // Tạo update object để truyền vào updateOne
         const updateObj = {
-          $pull: { members: userId },
+          $pull: {
+            members: userId,
+            groupDeputies: userId, // 👈 Thu hồi quyền phó nhóm khi rời
+          },
           $push: {
             leftMembers: {
               userId,
@@ -223,15 +227,15 @@ const chatSocket = (io) => {
           lastMessageTime: new Date(),
           latestmessage: lastMess.text,
         };
-    
+
         // Nếu có newLeaderId thì cập nhật lại nhóm trưởng
         if (newLeaderId) {
           updateObj.$set = { groupLeader: newLeaderId };
         }
-    
+
         await Conversation.updateOne({ _id: conversationId }, updateObj);
-    
-        // Phát sự kiện cho tất cả client
+
+        // Phát sự kiện cập nhật UI cho các thành viên còn lại
         io.emit("groupUpdated", {
           conversationId,
           latestmessage: lastMess.text,
@@ -242,17 +246,15 @@ const chatSocket = (io) => {
           },
           newLeaderId: newLeaderId || null,
         });
-    
+
         console.log(
-          `Người dùng ${userId} đã rời nhóm ${conversationId} ${
-            newLeaderId ? `(nhóm trưởng mới: ${newLeaderId})` : ""
+          `Người dùng ${userId} đã rời nhóm ${conversationId} ${newLeaderId ? `(nhóm trưởng mới: ${newLeaderId})` : ""
           }`
         );
       } catch (error) {
         console.error("Lỗi khi rời nhóm:", error);
       }
     });
-    
 
     // Thêm thành viên vào nhóm
     socket.on("addMembersToGroup", async ({ conversationId, newMemberIds, addedBy }) => {
@@ -333,7 +335,7 @@ const chatSocket = (io) => {
               createdAt: new Date(),
               lastMessageId: lastMessage._id,
             },
-            groupLeader: userId, 
+            groupLeader: userId,
             lastMessageId: lastMessage._id,
             lastMessageTime: new Date(),
             lastMessageSenderId: userId,
@@ -355,7 +357,7 @@ const chatSocket = (io) => {
       console.log("Message updated in conversation: " + conversationId);
     });
 
-  
+
     socket.on("kickMember", async ({ conversationId, targetUserId, byUserId }) => {
       console.log("Kick member event received:", {
         conversationId,
@@ -421,7 +423,7 @@ const chatSocket = (io) => {
             $pull: {
               members: targetUserId,
               groupDeputies: targetUserId, // 👈 Gỡ quyền phó nhóm nếu có
-             },
+            },
             $push: {
               leftMembers: {
                 userId: targetUserId,
@@ -446,7 +448,7 @@ const chatSocket = (io) => {
       }
     });
 
-//Phân quyền, thu hồi quyền phó nhóm
+    //Phân quyền, thu hồi quyền phó nhóm
 
     socket.on("toggleDeputy", async ({ conversationId, targetUserId, byUserId }) => {
       console.log("Toggle deputy event received:", {
@@ -582,7 +584,7 @@ const chatSocket = (io) => {
 
         // Tạo lời mời mới
         const request = await FriendRequest.create({ senderId, receiverId });
-     
+
 
         // Gửi realtime đến receiver qua room có tên là userId
         io.to(receiverId).emit("new_friend_request", request);
@@ -602,7 +604,7 @@ const chatSocket = (io) => {
 
     // Chấp nhận lời mời
     socket.on("accept_friend_request", async ({ senderId, receiverId }, callback) => {
-     
+
 
       try {
         const request = await FriendRequest.findOneAndUpdate(
@@ -657,6 +659,7 @@ const chatSocket = (io) => {
 
 
     // Thu hồi lời mời
+
     socket.on("cancel_friend_request", async ({ senderId, receiverId }, callback) => {
       try {
         const result = await FriendRequest.findOneAndDelete({
@@ -669,13 +672,8 @@ const chatSocket = (io) => {
           return callback({ success: false, message: "Không tìm thấy lời mời để thu hồi" });
         }
 
-        // Có thể emit cho người nhận nếu đang online
-        const receiverSocketId = onlineUsers[receiverId];
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("friend_request_cancelled", {
-            senderId,
-          });
-        }
+        // Gửi thông báo realtime đến người nhận
+        io.to(receiverId).emit("friend_request_cancelled", { senderId });
 
         callback({ success: true, message: "Thu hồi thành công" });
       } catch (error) {
@@ -683,6 +681,7 @@ const chatSocket = (io) => {
         callback({ success: false, message: "Lỗi server!" });
       }
     });
+
 
 
     // Hủy kết bạn
@@ -723,10 +722,10 @@ const chatSocket = (io) => {
     socket.on("get_friend_requests", async ({ userId }, callback) => {
       try {
         const requests = await FriendRequest.find({
-          receiverId: userId,  status: "pending",
+          receiverId: userId, status: "pending",
         }).populate("senderId", "username avatar")
           .populate("receiverId", "username avatar");
-       
+
 
         callback({ success: true, friendRequests: requests });
       } catch (error) {
@@ -748,7 +747,7 @@ const chatSocket = (io) => {
           ],
         })
           .populate("senderId receiverId", "username avatar"); // Populate username và avatar từ senderId và receiverId
-       
+
 
         // Lọc bạn bè hợp lệ từ các yêu cầu chấp nhận
         const friends = acceptedRequests.map((req) =>
@@ -757,7 +756,7 @@ const chatSocket = (io) => {
 
         // Truy vấn lại bảng User để lấy thông tin username và avatar của bạn bè
         const friendIds = friends.map(friend => friend._id);
-    
+
         const users = await User.find({ _id: { $in: friendIds } }).select("username avatar");
 
         // Ghép thông tin từ bảng User vào danh sách bạn bè
@@ -766,7 +765,7 @@ const chatSocket = (io) => {
           return user ? { ...friend.toObject(), ...user.toObject() } : null;
         }).filter(friend => friend !== null); // Lọc bỏ phần tử null
 
-    
+
 
         callback({ success: true, friends: friendsWithDetails });
       } catch (error) {
@@ -781,11 +780,11 @@ const chatSocket = (io) => {
       const { phone } = data; // Nhận phone từ client
 
       try {
-     
+
 
         // Tìm người dùng theo phone
         const user = await User.findOne({ phone }).select("_id username phone avatar");
-        
+
 
         if (!user) {
           return callback({ success: false, message: "Không tìm thấy người dùng" });

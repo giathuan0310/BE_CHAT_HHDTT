@@ -185,10 +185,10 @@ const updateGroup = async (req, res) => {
     }
 
     // ===== Regex kiểm tra tên nhóm =====
-    const nameRegex = /^[a-zA-ZÀ-ỹ]+(?:\s[a-zA-ZÀ-ỹ]+)*$/;
+    const nameRegex = /^[a-zA-ZÀ-ỹ0-9]+(?:\s[a-zA-ZÀ-ỹ0-9]+)*$/;
     if (!nameRegex.test(name)) {
       return res.status(400).json({
-        error: "Tên nhóm chỉ bao gồm chữ và khoảng trắng",
+        error: "Tên nhóm chỉ bao gồm chữ số và khoảng trắng",
       });
     }
 
