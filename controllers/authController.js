@@ -10,55 +10,6 @@ const client = new OAuth2Client(client_id);
 
 let refreshTokens = [];
 const authController = {
-  //Register
-  // registerUser: async(req,res)=>{
-  //   try {
-  //     const { username, email, password } = req.body;
-
-  //     // 1. Kiểm tra email đã tồn tại
-  //     const existingUser = await User.findOne({ email });
-  //     if (existingUser) {
-  //       return res.status(400).json({ message: "Email đã tồn tại." });
-  //     }
-
-  //     // 2. Mã hóa password
-  //     const salt = await bcrypt.genSalt(10);
-  //     const hashedPassword = await bcrypt.hash(password, salt);
-
-  //     // 3. Tạo user mới
-  //     const newUser = new User({
-  //       username,
-  //       email,
-  //       password: hashedPassword,
-  //     });
-
-  //     // 4. Lưu vào database
-  //     const user = await newUser.save();
-
-  //     // 5. Tạo token xác minh email
-  //     const emailToken = jwt.sign(
-  //       { id: user._id },
-  //       process.env.JWT_EMAIL_SECRET,
-  //       { expiresIn: "1h" }
-  //     );
-  //      // 6. Gửi email xác minh
-  // try {
-  //   await sendVerificationEmail(user.email, emailToken);
-  //   res.status(200).json({
-  //     message: "Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản.",
-  //   });
-  // } catch (err) {
-  //   await User.findByIdAndDelete(user._id); // Xóa user nếu gửi email thất bại
-  //   res.status(500).json({
-  //     message: "Gửi email xác minh thất bại. Vui lòng thử lại.",
-  //   });
-  // }
-  //     } catch (err) {
-  //         res.status(500).json(err)
-  //     }
-
-  // },
-
   // Register
   registerUser: async (req, res) => {
     try {
@@ -204,13 +155,18 @@ const authController = {
     );
   },
 
-  //Login
   // Login
   loginUser: async (req, res) => {
     try {
       const user = await User.findOne({ email: req.body.email });
       if (!user) {
         return res.status(401).json({ message: "Email Không chính xác!" }); // Chuyển từ 404 thành 401
+      }
+      // ✅ Kiểm tra email đã được xác minh chưa
+      if (!user.isVerified) {
+        return res.status(403).json({
+          message: "Email chưa được xác minh. Vui lòng kiểm tra hộp thư và xác minh tài khoản trước khi đăng nhập."
+        });
       }
 
       // Kiểm tra mật khẩu
